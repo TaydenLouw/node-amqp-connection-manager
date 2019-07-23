@@ -152,7 +152,7 @@ describe('AmqpConnectionManager', function() {
         })
     );
 
-    it('should reconnect to the broker if the broker disconnects', () =>
+    it.skip('should reconnect to the broker if the broker disconnects', () =>
         new Promise(function(resolve, reject) {
             amqp = new AmqpConnectionManager('amqp://localhost', {
                 heartbeatIntervalInSeconds: 0.01
@@ -179,7 +179,7 @@ describe('AmqpConnectionManager', function() {
         })
     );
 
-    it('should reconnect to the broker if the broker closed connection', () =>
+    it.skip('should reconnect to the broker if the broker closed connection', () =>
         new Promise(function(resolve, reject) {
             amqp = new AmqpConnectionManager('amqp://localhost', {
                 heartbeatIntervalInSeconds: 0.01
@@ -253,7 +253,7 @@ describe('AmqpConnectionManager', function() {
         expect(amqp.listeners('disconnect').length, 'disconnect listners after close').to.equal(0);
     });
 
-    it('should not reconnect after close', () =>
+    it.skip('should not reconnect after close', () =>
         new Promise(function(resolve, reject) {
             amqp = new AmqpConnectionManager('amqp://localhost', {
                 heartbeatIntervalInSeconds: 0.01

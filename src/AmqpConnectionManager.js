@@ -46,9 +46,13 @@ export default class AmqpConnectionManager extends EventEmitter {
      *   to connect to, either a single URL or an array of URLs.  This is handy
      *   when you're using a service discovery mechanism such as Consul or etcd.
      *   Note that if this is supplied, then `urls` is ignored.
+     * @param {Object} logger - A logger interface to log errors.
      */
-    constructor(urls, options = {}) {
+    constructor(urls, options = {}, logger = {
+        debug: () => {}
+    }) {
         super();
+        this.logger = logger;
         if(!urls && !options.findServers) {
             throw new Error("Must supply either `urls` or `findServers`");
         }
@@ -101,12 +105,15 @@ export default class AmqpConnectionManager extends EventEmitter {
     }
 
     _connect() {
+        this.logger.debug('Started _connect method');
         if(this._closed || this._connecting || this.isConnected()) {
+            this.logger.debug(`Instantly resolving: _closed = ${this._closed}, _connecting = ${this._connecting}, 
+            isConnected() = ${this.isConnected()}`);
             return Promise.resolve();
         }
 
         this._connecting = true;
-
+        this.logger.debug('_connecting set to true');
         return Promise.resolve()
         .then(() => {
             if(!this._urls || (this._currentUrl >= this._urls.length)) {
@@ -138,9 +145,10 @@ export default class AmqpConnectionManager extends EventEmitter {
             } else {
                 amqpUrl.search = `?heartbeat=${this.heartbeatIntervalInSeconds}`;
             }
-
+            this.logger.debug('Attempting to connect to rabbitMq');
             return amqp.connect(urlUtils.format(amqpUrl), connectionOptions)
             .then(connection => {
+                this.logger.debug(`Connection established`);
                 this._currentConnection = connection;
 
                 //emit 'blocked' when RabbitMQ server decides to block the connection (resources running low)
@@ -148,40 +156,51 @@ export default class AmqpConnectionManager extends EventEmitter {
 
                 connection.on('unblocked', () => this.emit('unblocked'));
 
-                connection.on('error', (/* err */) => {
+                connection.on('error', (err) => {
                     // if this event was emitted, then the connection was already closed,
                     // so no need to call #close here
                     // also, 'close' is emitted after 'error',
                     // so no need for work already done in 'close' handler
+                    this.debug(`Connection raised error event: message - ${err.message}; stack - ${err.stack}`);
                 });
 
                 // Reconnect if the connection closes
                 connection.on('close', err => {
+                    this.debug(`Connection raised close event: message - ${err.message}; stack - ${err.stack}`);
                     this._currentConnection = null;
+                    this.logger.debug('_currentConnection set to null');
                     this.emit('disconnect', { err });
-
+                    this.logger.debug(`Emitted disconnect event`);
+                    this.logger.debug(`Waiting ${this.reconnectTimeInSeconds * 1000} seconds to attempt a reconnect`);
                     wait(this.reconnectTimeInSeconds * 1000)
-                    .then(() => this._connect())
+                    .then(() => {
+                        this.logger.debug(`Attempting to reconnect`);
+                        this._connect();
+                    })
                     // `_connect()` should never throw.
                     .catch(neverThrows);
                 });
 
                 this._connecting = false;
+                this.logger.debug(`_connecting set to false`);
                 this.emit('connect', { connection, url: urlString });
-
+                this.logger.debug(`Emitted connect event`);
                 return null;
             });
         })
         .catch(err => {
             this.emit('disconnect', { err });
-
+            this.logger.debug(`Emitted disconnect event`);
             // Connection failed...
             this._currentConnection = null;
-
+            this.logger.debug('_currentConnection set to null');
             // TODO: Probably want to try right away here, especially if there are multiple brokers to try...
+            this.logger.debug(`Waiting ${this.reconnectTimeInSeconds * 1000} seconds to attempt a reconnect`);
             return wait(this.reconnectTimeInSeconds * 1000)
             .then(() => {
+                this.logger.debug(`Attempting to reconnect`);
                 this._connecting = false;
+                this.logger.debug(`_connecting set to false`);
                 return this._connect();
             });
         });

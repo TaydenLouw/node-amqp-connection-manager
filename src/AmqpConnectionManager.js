@@ -154,12 +154,12 @@ export default class AmqpConnectionManager extends EventEmitter {
                 //emit 'blocked' when RabbitMQ server decides to block the connection (resources running low)
                 connection.on('blocked', reason => {
                     this.logger.debug(`Connection raised a blocked event: ${reason}`);
-                    this.emit('blocked', { reason })
+                    this.emit('blocked', { reason });
                 });
 
                 connection.on('unblocked', () => {
-                    this.logger.debug(`Connection raised an unblock event.`)
-                    this.emit('unblocked')
+                    this.logger.debug(`Connection raised an unblock event.`);
+                    this.emit('unblocked');
                 });
 
                 connection.on('error', (err) => {
